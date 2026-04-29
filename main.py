@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from tkinter import filedialog
 import pygame
+import whisper
+import threading
 
 # init pygame mixer
 pygame.mixer.init()
@@ -42,6 +44,28 @@ def stop_song():
     pygame.mixer.music.stop()
     paused = False
 
+# run whisper in background thread
+def transcribe_thread():
+    if song_path == "":
+        return
+    lyrics_box.delete("1.0", "end")
+    lyrics_box.insert("1.0", "Generating... please wait")
+    btn_lyrics.configure(state="disabled")
+
+    def run():
+        model = whisper.load_model("base")
+        result = model.transcribe(song_path)
+        text = result["text"].strip()
+        # update UI from thread
+        app.after(0, lambda: update_lyrics(text))
+
+    threading.Thread(target=run, daemon=True).start()
+
+def update_lyrics(text):
+    lyrics_box.delete("1.0", "end")
+    lyrics_box.insert("1.0", text)
+    btn_lyrics.configure(state="normal")
+
 # init window
 app = ctk.CTk()
 app.title("Music Player")
@@ -65,6 +89,9 @@ btn_pause.pack(pady=8)
 
 btn_stop = ctk.CTkButton(left_frame, text="Stop", command=stop_song)
 btn_stop.pack(pady=8)
+
+btn_lyrics = ctk.CTkButton(left_frame, text="Generate Lyrics", command=transcribe_thread)
+btn_lyrics.pack(pady=8)
 
 # right frame - lyrics box
 right_frame = ctk.CTkFrame(app)
