@@ -22,7 +22,7 @@ async def transcribe(file: UploadFile = File(...)):
         tmp.write(await file.read())
         tmp_path = tmp.name
 
-    result = model.transcribe(tmp_path, word_timestamps=True)
+    result = model.transcribe(tmp_path, word_timestamps=True, condition_on_previous_text=False)
     os.remove(tmp_path)
 
     segments = []
@@ -44,16 +44,24 @@ async def transcribe(file: UploadFile = File(...)):
             word_text = word_data["word"].strip()
             current_line.append(word_text)
             
-            is_punctuation = word_text.endswith((".", ",", "?", "!", ";"))
-            is_long_enough = len(current_line) >= 6
             is_last_word = i == len(words) - 1
+            has_punctuation = word_text.endswith((".", "?", "!"))
             
-            if is_punctuation or is_long_enough or is_last_word:
-                segments.append({
-                    "start": start_time,
-                    "end": word_data["end"],
-                    "text": " ".join(current_line)
-                })
+            is_pause = False
+            if not is_last_word:
+                next_word_start = words[i+1]["start"]
+                current_word_end = word_data["end"]
+                if (next_word_start - current_word_end) > 0.4:
+                    is_pause = True
+            
+            if has_punctuation or is_pause or is_last_word:
+                line_text = " ".join(current_line).strip()
+                if line_text:
+                    segments.append({
+                        "start": start_time,
+                        "end": word_data["end"],
+                        "text": line_text
+                    })
                 current_line = []
                 if not is_last_word:
                     start_time = words[i+1]["start"]
