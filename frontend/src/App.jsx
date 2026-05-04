@@ -7,6 +7,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [segments, setSegments] = useState([]);
   const [loading, setLoading] = useState(false);
   
@@ -50,6 +51,25 @@ export default function App() {
 
   function handleLoadedMetadata(e) {
     setDuration(e.target.duration);
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }
+
+  function handleVolumeChange(e) {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    if (audioRef.current) {
+      audioRef.current.volume = val;
+    }
+  }
+
+  function handleLyricClick(time) {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+      if (!isPlaying) togglePlay();
+    }
   }
 
   async function handleGenerate() {
@@ -82,9 +102,9 @@ export default function App() {
   );
 
   return (
-    <div className="bg-surface-container-lowest font-inter text-on-surface h-screen w-screen overflow-hidden flex flex-col items-center justify-center pt-20">
+    <div className="bg-surface-container-lowest font-inter text-on-surface h-screen w-screen overflow-hidden flex flex-col pt-20">
       
-      {/* fisier audio ascuns */}
+      {/* hidden audio file */}
       {audioUrl && (
         <audio
           ref={audioRef}
@@ -96,25 +116,19 @@ export default function App() {
         />
       )}
 
-      <header className="fixed top-0 w-full z-50 bg-black/80 backdrop-blur-2xl border-b border-white/5 shadow-2xl flex justify-between items-center px-8 h-20">
+      {/* clean header */}
+      <header className="fixed top-0 w-full z-50 bg-black/80 backdrop-blur-2xl border-b border-white/5 shadow-2xl flex justify-center items-center h-20">
         <div className="text-2xl font-black tracking-tight text-primary italic">SmartMusicPlayer</div>
-        <div className="flex gap-4">
-          <button className="text-gray-400 hover:text-primary transition-colors p-2 flex items-center justify-center">
-            <span className="material-symbols-outlined">account_circle</span>
-          </button>
-          <button className="text-gray-400 hover:text-primary transition-colors p-2 flex items-center justify-center">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-        </div>
       </header>
 
-      <main className="w-full max-w-[1440px] h-[calc(100vh-80px)] flex gap-8 p-10 mx-auto">
-        <aside className="w-1/3 flex flex-col gap-8 h-full">
+      {/* full screen container */}
+      <main className="w-full h-full flex gap-12 p-10">
+        <aside className="w-1/3 flex flex-col gap-8 h-full min-w-[350px]">
           
           {/* drop zone */}
           <label htmlFor="file-upload" className="bg-surface-container rounded-xl p-8 border border-dashed border-outline-variant flex flex-col items-center justify-center h-48 hover:border-primary transition-colors cursor-pointer group">
             <span className="material-symbols-outlined text-4xl text-on-surface-variant group-hover:text-primary transition-colors mb-2">upload_file</span>
-            <span className="text-xl font-medium text-on-surface">{audioFile ? audioFile.name : "Drop Audio File"}</span>
+            <span className="text-xl font-medium text-on-surface text-center px-4">{audioFile ? audioFile.name : "Drop Audio File"}</span>
             <span className="text-sm text-on-surface-variant mt-1">MP3, WAV, FLAC</span>
             <input id="file-upload" type="file" accept="audio/*" onChange={handleFileChange} className="hidden" />
           </label>
@@ -155,6 +169,21 @@ export default function App() {
                 <span className="material-symbols-outlined text-2xl">skip_next</span>
               </button>
             </div>
+
+            {/* volume control */}
+            <div className="flex items-center justify-center gap-3 relative z-10">
+              <span className="material-symbols-outlined text-on-surface-variant text-sm">volume_down</span>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.01" 
+                value={volume} 
+                onChange={handleVolumeChange} 
+                className="w-24 accent-primary"
+              />
+              <span className="material-symbols-outlined text-on-surface-variant text-sm">volume_up</span>
+            </div>
           </div>
 
           <button onClick={handleGenerate} disabled={!audioFile || loading} className="mt-auto w-full py-4 px-6 border border-primary text-primary rounded-lg text-sm tracking-widest hover:bg-primary/10 transition-all shadow-[0_0_12px_rgba(10,255,157,0.1)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -167,10 +196,10 @@ export default function App() {
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#0A0C10] to-transparent z-10 pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#0A0C10] to-transparent z-10 pointer-events-none"></div>
           
-          <div className="h-full overflow-y-auto hide-scrollbar flex flex-col gap-6 py-32 scroll-smooth">
+          <div className="h-full overflow-y-auto hide-scrollbar flex flex-col gap-6 py-40 scroll-smooth">
             {segments.length === 0 ? (
               <p className="text-[2rem] leading-tight text-on-surface-variant/30 text-center">
-                {loading ? "Se analizeaza vocea..." : "Versurile se vor incarca aici."}
+                {loading ? "Downloading model and analyzing voice (this may take a while)..." : "Lyrics will load here."}
               </p>
             ) : (
               segments.map((seg, i) => {
@@ -179,10 +208,11 @@ export default function App() {
                   <p
                     key={i}
                     ref={isActive ? activeLyricRef : null}
-                    className={`leading-tight transition-all duration-500 origin-left ${
+                    onClick={() => handleLyricClick(seg.start)}
+                    className={`leading-tight transition-all duration-300 cursor-pointer ${
                       isActive
-                        ? "text-[3rem] font-bold glow-active transform scale-105 my-4"
-                        : "text-[2rem] text-on-surface-variant/30"
+                        ? "text-[2.5rem] font-bold text-white glow-active my-2"
+                        : "text-[2rem] text-on-surface-variant/40 hover:text-on-surface-variant/70"
                     }`}
                   >
                     {seg.text}

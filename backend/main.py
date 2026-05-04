@@ -13,7 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = whisper.load_model("small")
+model = whisper.load_model("medium")
 
 @app.post("/api/transcribe")
 async def transcribe(file: UploadFile = File(...)):
